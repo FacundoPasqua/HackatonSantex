@@ -51,14 +51,14 @@ app.add_middleware(
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
     try:
-        print(f"📥 {request.method} {request.url.path}")
+        print(f"📥 {request.method} {request.url.path}", flush=True)
         response = await call_next(request)
-        print(f"✅ {request.method} {request.url.path} - Status: {response.status_code}")
+        print(f"✅ {request.method} {request.url.path} - Status: {response.status_code}", flush=True)
         return response
     except Exception as e:
         error_trace = traceback.format_exc()
-        print(f"❌ Error en {request.method} {request.url.path}: {str(e)}")
-        print(f"📋 Traceback:\n{error_trace}")
+        print(f"❌ Error en {request.method} {request.url.path}: {str(e)}", flush=True)
+        print(f"📋 Traceback:\n{error_trace}", flush=True)
         return JSONResponse(
             status_code=500,
             content={"detail": f"Internal server error: {str(e)}"}
@@ -75,7 +75,7 @@ def get_db():
 @app.get("/")
 def read_root():
     try:
-        print("📥 Request recibida en /")
+        print("📥 Request recibida en /", flush=True)
         response = {
             "message": "Test Results API",
             "version": "1.0.0",
@@ -91,10 +91,11 @@ def read_root():
                 "GET /api/results/recent/{hours}": "Obtener resultados recientes"
             }
         }
-        print("✅ Response enviada desde /")
+        print("✅ Response enviada desde /", flush=True)
         return response
     except Exception as e:
-        print(f"❌ Error en /: {str(e)}")
+        print(f"❌ Error en /: {str(e)}", flush=True)
+        print(f"📋 Traceback: {traceback.format_exc()}", flush=True)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.post("/api/results", response_model=TestResultResponse)
