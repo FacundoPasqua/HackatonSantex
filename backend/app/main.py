@@ -14,7 +14,12 @@ from app.schemas import (
 )
 
 # Crear tablas
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+    print("✅ Database tables created successfully")
+except Exception as e:
+    print(f"⚠️ Warning: Could not create database tables: {e}")
+    print("The server will start but database operations may fail")
 
 app = FastAPI(
     title="Test Results API",
