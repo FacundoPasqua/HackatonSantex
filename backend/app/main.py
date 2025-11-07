@@ -69,11 +69,23 @@ async def catch_exceptions_middleware(request: Request, call_next):
 
 # Dependency para obtener DB session
 def get_db():
-    db = SessionLocal()
     try:
-        yield db
-    finally:
-        db.close()
+        print("🔌 Creando sesión de BD...", flush=True)
+        db = SessionLocal()
+        print("✅ Sesión de BD creada", flush=True)
+        try:
+            yield db
+        finally:
+            print("🔌 Cerrando sesión de BD...", flush=True)
+            db.close()
+            print("✅ Sesión de BD cerrada", flush=True)
+    except Exception as e:
+        print(f"❌ Error en get_db: {str(e)}", flush=True)
+        print(f"📋 Traceback: {traceback.format_exc()}", flush=True)
+        import sys
+        sys.stdout.flush()
+        sys.stderr.flush()
+        raise
 
 @app.get("/")
 def read_root():
