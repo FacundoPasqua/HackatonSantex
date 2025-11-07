@@ -65,12 +65,16 @@ def get_test_results(
     from firebase_admin import firestore
     query = query.order_by("timestamp", direction=firestore.Query.DESCENDING)
     
-    # Aplicar paginación
-    results = query.limit(limit).offset(offset).stream()
+    # Firestore no soporta offset directamente, así que obtenemos más y hacemos offset manual
+    # Obtenemos limit + offset para poder hacer el offset manualmente
+    all_docs = list(query.limit(limit + offset).stream())
+    
+    # Aplicar offset manualmente
+    docs = all_docs[offset:offset + limit]
     
     # Convertir a lista de diccionarios
     result_list = []
-    for doc in results:
+    for doc in docs:
         data = doc.to_dict()
         data["id"] = doc.id
         
