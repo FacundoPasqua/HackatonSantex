@@ -47,7 +47,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Middleware para capturar errores
+# Middleware para capturar errores - Simplificado para debugging
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
     try:
@@ -59,6 +59,9 @@ async def catch_exceptions_middleware(request: Request, call_next):
         error_trace = traceback.format_exc()
         print(f"❌ Error en {request.method} {request.url.path}: {str(e)}", flush=True)
         print(f"📋 Traceback:\n{error_trace}", flush=True)
+        import sys
+        sys.stdout.flush()
+        sys.stderr.flush()
         return JSONResponse(
             status_code=500,
             content={"detail": f"Internal server error: {str(e)}"}
@@ -74,13 +77,25 @@ def get_db():
 
 @app.get("/")
 def read_root():
+    import sys
     try:
         print("📥 Request recibida en /", flush=True)
+        sys.stdout.flush()
+        
+        # Verificar conexión a BD sin hacer query
+        db_status = "unknown"
+        try:
+            # Solo verificar que el engine existe, no hacer query
+            if engine:
+                db_status = "engine_exists"
+        except:
+            db_status = "error"
+        
         response = {
             "message": "Test Results API",
             "version": "1.0.0",
             "status": "running",
-            "database": "connected" if engine else "disconnected",
+            "database": db_status,
             "endpoints": {
                 "POST /api/results": "Guardar un resultado de test",
                 "POST /api/results/batch": "Guardar múltiples resultados",
@@ -92,11 +107,16 @@ def read_root():
             }
         }
         print("✅ Response enviada desde /", flush=True)
+        sys.stdout.flush()
         return response
     except Exception as e:
-        print(f"❌ Error en /: {str(e)}", flush=True)
-        print(f"📋 Traceback: {traceback.format_exc()}", flush=True)
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        error_msg = str(e)
+        error_trace = traceback.format_exc()
+        print(f"❌ Error en /: {error_msg}", flush=True)
+        print(f"📋 Traceback: {error_trace}", flush=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        raise HTTPException(status_code=500, detail=f"Error: {error_msg}")
 
 @app.post("/api/results", response_model=TestResultResponse)
 def create_result(result: TestResultCreate, db: Session = Depends(get_db)):
