@@ -53,3 +53,8 @@ test_results.db
 
 # Android
 .android/
+
+# Backend venv (pero no el código)
+backend/venv/
+backend/__pycache__/
+backend/*.db
