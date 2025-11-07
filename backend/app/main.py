@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, List
 from datetime import datetime, timedelta
 import os
+import traceback
 
 from app.database import SessionLocal, engine
 from app.models import Base, TestResult
@@ -30,8 +32,12 @@ app = FastAPI(
 # CORS para permitir frontend y tests
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:8000"
+    "http://localhost:3000,http://localhost:8000,*"
 ).split(",")
+
+# Si hay "*" en los orígenes, permitir todos (útil para tests desde cualquier origen)
+if "*" in ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,6 +46,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware para capturar errores
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    try:
+        print(f"📥 {request.method} {request.url.path}")
+        response = await call_next(request)
+        print(f"✅ {request.method} {request.url.path} - Status: {response.status_code}")
+        return response
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        print(f"❌ Error en {request.method} {request.url.path}: {str(e)}")
+        print(f"📋 Traceback:\n{error_trace}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal server error: {str(e)}"}
+        )
 
 # Dependency para obtener DB session
 def get_db():
@@ -51,28 +74,44 @@ def get_db():
 
 @app.get("/")
 def read_root():
-    return {
-        "message": "Test Results API",
-        "version": "1.0.0",
-        "endpoints": {
-            "POST /api/results": "Guardar un resultado de test",
-            "POST /api/results/batch": "Guardar múltiples resultados",
-            "GET /api/results": "Obtener resultados con filtros",
-            "GET /api/statistics": "Obtener estadísticas",
-            "GET /api/summary": "Resumen general",
-            "GET /api/results/{id}": "Obtener resultado por ID",
-            "GET /api/results/recent/{hours}": "Obtener resultados recientes"
+    try:
+        print("📥 Request recibida en /")
+        response = {
+            "message": "Test Results API",
+            "version": "1.0.0",
+            "status": "running",
+            "database": "connected" if engine else "disconnected",
+            "endpoints": {
+                "POST /api/results": "Guardar un resultado de test",
+                "POST /api/results/batch": "Guardar múltiples resultados",
+                "GET /api/results": "Obtener resultados con filtros",
+                "GET /api/statistics": "Obtener estadísticas",
+                "GET /api/summary": "Resumen general",
+                "GET /api/results/{id}": "Obtener resultado por ID",
+                "GET /api/results/recent/{hours}": "Obtener resultados recientes"
+            }
         }
-    }
+        print("✅ Response enviada desde /")
+        return response
+    except Exception as e:
+        print(f"❌ Error en /: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.post("/api/results", response_model=TestResultResponse)
 def create_result(result: TestResultCreate, db: Session = Depends(get_db)):
     """Guardar un resultado de test"""
-    db_result = TestResult(**result.dict())
-    db.add(db_result)
-    db.commit()
-    db.refresh(db_result)
-    return db_result
+    try:
+        print(f"📥 Recibiendo resultado: {result.test_id}")
+        db_result = TestResult(**result.dict())
+        db.add(db_result)
+        db.commit()
+        db.refresh(db_result)
+        print(f"✅ Resultado guardado: ID {db_result.id}")
+        return db_result
+    except Exception as e:
+        print(f"❌ Error guardando resultado: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error guardando resultado: {str(e)}")
 
 @app.post("/api/results/batch", response_model=List[TestResultResponse])
 def create_results_batch(results: List[TestResultCreate], db: Session = Depends(get_db)):

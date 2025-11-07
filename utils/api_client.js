@@ -26,13 +26,15 @@ async function guardarResultadoEnBD(resultado) {
       sheet_name: resultado.sheetName || null
     };
 
+    console.log(`🔗 [${resultado.id}] Intentando guardar en: ${API_URL}/api/results`);
+    
     const response = await fetch(`${API_URL}/api/results`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(30000) // Aumentado a 30 segundos
     });
 
     if (response.ok) {
