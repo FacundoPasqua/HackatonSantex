@@ -79,32 +79,39 @@ function ResultsTable({ results, loading, pagination, onPageChange }) {
               return (
                 <React.Fragment key={resultId}>
                   <tr>
-                    {displayColumns.map((col) => (
-                      <td key={col} className={col === 'respuesta_bot' ? 'respuesta-bot-cell' : ''}>
-                        {col === 'resultado_final'
-                          ? formatResultado(result[col])
-                          : col === 'tiempo_segundos'
-                          ? `${result[col]}s`
-                          : col === 'respuesta_bot'
-                          ? (
-                              <div className="respuesta-bot-container">
-                                <span className={needsExpansion ? 'respuesta-bot-text' : ''}>
-                                  {formatRespuestaBot(result[col], resultId, isExpanded)}
-                                </span>
-                                {needsExpansion && (
-                                  <button
-                                    className="respuesta-bot-toggle"
-                                    onClick={() => toggleRespuesta(resultId)}
-                                    title={isExpanded ? 'Colapsar' : 'Expandir'}
-                                  >
-                                    {isExpanded ? '−' : '+'}
-                                  </button>
-                                )}
-                              </div>
-                            )
-                          : result[col]}
-                      </td>
-                    ))}
+                    {displayColumns.map((col) => {
+                      let cellContent
+                      if (col === 'resultado_final') {
+                        cellContent = formatResultado(result[col])
+                      } else if (col === 'tiempo_segundos') {
+                        cellContent = `${result[col]}s`
+                      } else if (col === 'respuesta_bot') {
+                        cellContent = (
+                          <div className="respuesta-bot-container">
+                            <span className={needsExpansion ? 'respuesta-bot-text' : ''}>
+                              {formatRespuestaBot(result[col], resultId, isExpanded)}
+                            </span>
+                            {needsExpansion && (
+                              <button
+                                className="respuesta-bot-toggle"
+                                onClick={() => toggleRespuesta(resultId)}
+                                title={isExpanded ? 'Colapsar' : 'Expandir'}
+                              >
+                                {isExpanded ? '−' : '+'}
+                              </button>
+                            )}
+                          </div>
+                        )
+                      } else {
+                        cellContent = result[col]
+                      }
+                      
+                      return (
+                        <td key={col} className={col === 'respuesta_bot' ? 'respuesta-bot-cell' : ''}>
+                          {cellContent}
+                        </td>
+                      )
+                    })}
                   </tr>
                 </React.Fragment>
               )
