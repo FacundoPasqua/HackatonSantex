@@ -1,0 +1,33 @@
+{
+  "name": "test-results-dashboard",
+  "version": "1.0.0",
+  "description": "Sistema para almacenar y visualizar resultados de tests automatizados",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report"
+  },
+  "keywords": [
+    "playwright",
+    "testing",
+    "automation",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^24.6.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "google-auth-library": "^10.4.0",
+    "googleapis": "^161.0.0",
+    "xlsx": "^0.18.5"
+  }
+}
+
