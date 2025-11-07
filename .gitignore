@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.db
+*.sqlite
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+build/
+.npm
+.pnpm-debug.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+config.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test results
+test-results/
+playwright-report/
+*.zip
+
+# Credentials
+**/credentials/
+**/*credentials*.json
+
+# Database
+*.db
+test_results.db
+
+# Appium
+.appium/
+
+# Android
+.android/
