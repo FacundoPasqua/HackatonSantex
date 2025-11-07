@@ -1,27 +1,36 @@
-from fastapi import FastAPI, HTTPException, Depends, Query, Request
+"""
+FastAPI Backend con Firebase Firestore
+"""
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 import traceback
 
-from app.database import SessionLocal, engine
-from app.models import Base, TestResult
+from app.firebase_db import get_firestore_db
+from app.firestore_models import (
+    create_test_result,
+    get_test_result,
+    get_test_results,
+    get_recent_results,
+    get_statistics,
+    get_summary
+)
 from app.schemas import (
     TestResultCreate, TestResultResponse, 
     StatisticsResponse, SummaryResponse
 )
 
-# Crear tablas
+# Inicializar Firebase
 try:
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully")
+    db = get_firestore_db()
+    print("✅ Firebase Firestore initialized successfully")
 except Exception as e:
-    print(f"⚠️ Warning: Could not create database tables: {e}")
+    print(f"⚠️ Warning: Could not initialize Firebase: {e}")
     print("The server will start but database operations may fail")
+    db = None
 
 app = FastAPI(
     title="Test Results API",
@@ -47,9 +56,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Middleware para capturar errores - Simplificado para debugging
+# Middleware para capturar errores
 @app.middleware("http")
-async def catch_exceptions_middleware(request: Request, call_next):
+async def catch_exceptions_middleware(request, call_next):
     try:
         print(f"📥 {request.method} {request.url.path}", flush=True)
         response = await call_next(request)
@@ -67,47 +76,19 @@ async def catch_exceptions_middleware(request: Request, call_next):
             content={"detail": f"Internal server error: {str(e)}"}
         )
 
-# Dependency para obtener DB session
-def get_db():
-    try:
-        print("🔌 Creando sesión de BD...", flush=True)
-        db = SessionLocal()
-        print("✅ Sesión de BD creada", flush=True)
-        try:
-            yield db
-        finally:
-            print("🔌 Cerrando sesión de BD...", flush=True)
-            db.close()
-            print("✅ Sesión de BD cerrada", flush=True)
-    except Exception as e:
-        print(f"❌ Error en get_db: {str(e)}", flush=True)
-        print(f"📋 Traceback: {traceback.format_exc()}", flush=True)
-        import sys
-        sys.stdout.flush()
-        sys.stderr.flush()
-        raise
-
 @app.get("/")
 def read_root():
-    import sys
     try:
         print("📥 Request recibida en /", flush=True)
-        sys.stdout.flush()
         
-        # Verificar conexión a BD sin hacer query
-        db_status = "unknown"
-        try:
-            # Solo verificar que el engine existe, no hacer query
-            if engine:
-                db_status = "engine_exists"
-        except:
-            db_status = "error"
+        db_status = "connected" if db else "disconnected"
         
         response = {
             "message": "Test Results API",
             "version": "1.0.0",
             "status": "running",
-            "database": db_status,
+            "database": "Firebase Firestore",
+            "db_status": db_status,
             "endpoints": {
                 "POST /api/results": "Guardar un resultado de test",
                 "POST /api/results/batch": "Guardar múltiples resultados",
@@ -119,42 +100,52 @@ def read_root():
             }
         }
         print("✅ Response enviada desde /", flush=True)
-        sys.stdout.flush()
         return response
     except Exception as e:
         error_msg = str(e)
         error_trace = traceback.format_exc()
         print(f"❌ Error en /: {error_msg}", flush=True)
         print(f"📋 Traceback: {error_trace}", flush=True)
-        sys.stdout.flush()
-        sys.stderr.flush()
         raise HTTPException(status_code=500, detail=f"Error: {error_msg}")
 
 @app.post("/api/results", response_model=TestResultResponse)
-def create_result(result: TestResultCreate, db: Session = Depends(get_db)):
+def create_result(result: TestResultCreate):
     """Guardar un resultado de test"""
     try:
-        print(f"📥 Recibiendo resultado: {result.test_id}")
-        db_result = TestResult(**result.dict())
-        db.add(db_result)
-        db.commit()
-        db.refresh(db_result)
-        print(f"✅ Resultado guardado: ID {db_result.id}")
-        return db_result
+        print(f"📥 Recibiendo resultado: {result.test_id}", flush=True)
+        
+        # Convertir a diccionario
+        data = result.dict()
+        data["timestamp"] = datetime.utcnow()
+        
+        # Crear en Firestore
+        created = create_test_result(data)
+        
+        print(f"✅ Resultado guardado: ID {created['id']}", flush=True)
+        
+        # Convertir a TestResultResponse
+        return TestResultResponse(**created)
     except Exception as e:
-        print(f"❌ Error guardando resultado: {str(e)}")
-        db.rollback()
+        print(f"❌ Error guardando resultado: {str(e)}", flush=True)
+        print(f"📋 Traceback: {traceback.format_exc()}", flush=True)
         raise HTTPException(status_code=500, detail=f"Error guardando resultado: {str(e)}")
 
 @app.post("/api/results/batch", response_model=List[TestResultResponse])
-def create_results_batch(results: List[TestResultCreate], db: Session = Depends(get_db)):
+def create_results_batch(results: List[TestResultCreate]):
     """Guardar múltiples resultados de test"""
-    db_results = [TestResult(**result.dict()) for result in results]
-    db.add_all(db_results)
-    db.commit()
-    for result in db_results:
-        db.refresh(result)
-    return db_results
+    try:
+        created_results = []
+        for result in results:
+            data = result.dict()
+            data["timestamp"] = datetime.utcnow()
+            created = create_test_result(data)
+            created_results.append(TestResultResponse(**created))
+        
+        print(f"✅ Guardados {len(created_results)} resultados", flush=True)
+        return created_results
+    except Exception as e:
+        print(f"❌ Error guardando lote: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error guardando lote: {str(e)}")
 
 @app.get("/api/results", response_model=List[TestResultResponse])
 def get_results(
@@ -162,126 +153,74 @@ def get_results(
     environment: Optional[str] = Query(None, description="Entorno: test, preprod, localhost"),
     resultado_final: Optional[str] = Query(None, description="Resultado: PASS, FAIL"),
     limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    offset: int = Query(0, ge=0)
 ):
     """Obtener resultados con filtros"""
-    query = db.query(TestResult)
-    
-    if test_type:
-        query = query.filter(TestResult.test_type == test_type)
-    if environment:
-        query = query.filter(TestResult.environment == environment)
-    if resultado_final:
-        if resultado_final == 'PASS':
-            query = query.filter(TestResult.resultado_final == 'PASS')
-        elif resultado_final == 'FAIL':
-            # Incluir todos los tipos de FAIL (FAIL, FAIL (JSON), FAIL general, etc.)
-            query = query.filter(TestResult.resultado_final != 'PASS')
-        else:
-            query = query.filter(TestResult.resultado_final == resultado_final)
-    
-    results = query.order_by(TestResult.timestamp.desc()).offset(offset).limit(limit).all()
-    return results
+    try:
+        results = get_test_results(
+            test_type=test_type,
+            environment=environment,
+            resultado_final=resultado_final,
+            limit=limit,
+            offset=offset
+        )
+        
+        # Convertir a TestResultResponse
+        return [TestResultResponse(**r) for r in results]
+    except Exception as e:
+        print(f"❌ Error obteniendo resultados: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error obteniendo resultados: {str(e)}")
 
 @app.get("/api/statistics", response_model=List[StatisticsResponse])
-def get_statistics(
+def get_statistics_endpoint(
     test_type: Optional[str] = None,
-    environment: Optional[str] = None,
-    db: Session = Depends(get_db)
+    environment: Optional[str] = None
 ):
     """Obtener estadísticas agrupadas"""
-    query = db.query(TestResult)
-    
-    if test_type:
-        query = query.filter(TestResult.test_type == test_type)
-    if environment:
-        query = query.filter(TestResult.environment == environment)
-    
-    # Obtener todos los resultados
-    results = query.all()
-    
-    # Agrupar manualmente para consolidar todos los FAILs
-    # Usar solo test_type como clave para sumar todos los entornos
-    stats_dict = {}
-    for result in results:
-        key = result.test_type
-        if key not in stats_dict:
-            stats_dict[key] = {'PASS': {'count': 0, 'total_time': 0}, 'FAIL': {'count': 0, 'total_time': 0}}
-        
-        if result.resultado_final == 'PASS':
-            stats_dict[key]['PASS']['count'] += 1
-            stats_dict[key]['PASS']['total_time'] += result.tiempo_segundos or 0
-        else:
-            # Cualquier cosa que no sea PASS es un FAIL
-            stats_dict[key]['FAIL']['count'] += 1
-            stats_dict[key]['FAIL']['total_time'] += result.tiempo_segundos or 0
-    
-    # Convertir a formato de respuesta
-    response = []
-    for test_type_key, data in stats_dict.items():
-        if data['PASS']['count'] > 0:
-            response.append({
-                "test_type": test_type_key,
-                "environment": "all",  # Indicar que es la suma de todos los entornos
-                "resultado_final": "PASS",
-                "count": data['PASS']['count'],
-                "avg_time": round(data['PASS']['total_time'] / data['PASS']['count'], 2) if data['PASS']['count'] > 0 else 0
-            })
-        if data['FAIL']['count'] > 0:
-            response.append({
-                "test_type": test_type_key,
-                "environment": "all",  # Indicar que es la suma de todos los entornos
-                "resultado_final": "FAIL",
-                "count": data['FAIL']['count'],
-                "avg_time": round(data['FAIL']['total_time'] / data['FAIL']['count'], 2) if data['FAIL']['count'] > 0 else 0
-            })
-    
-    return response
+    try:
+        stats = get_statistics(test_type=test_type, environment=environment)
+        return [StatisticsResponse(**s) for s in stats]
+    except Exception as e:
+        print(f"❌ Error obteniendo estadísticas: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
 
 @app.get("/api/summary", response_model=SummaryResponse)
-def get_summary(
+def get_summary_endpoint(
     test_type: Optional[str] = None,
-    environment: Optional[str] = None,
-    db: Session = Depends(get_db)
+    environment: Optional[str] = None
 ):
     """Resumen general de todos los tests"""
-    query = db.query(TestResult)
-    
-    if test_type:
-        query = query.filter(TestResult.test_type == test_type)
-    if environment:
-        query = query.filter(TestResult.environment == environment)
-    
-    total = query.count()
-    passed = query.filter(TestResult.resultado_final == 'PASS').count()
-    failed = query.filter(TestResult.resultado_final != 'PASS').count()
-    
-    return {
-        "total": total,
-        "passed": passed,
-        "failed": failed,
-        "success_rate": round((passed / total * 100) if total > 0 else 0, 2)
-    }
+    try:
+        summary = get_summary(test_type=test_type, environment=environment)
+        return SummaryResponse(**summary)
+    except Exception as e:
+        print(f"❌ Error obteniendo resumen: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error obteniendo resumen: {str(e)}")
 
 @app.get("/api/results/{result_id}", response_model=TestResultResponse)
-def get_result(result_id: int, db: Session = Depends(get_db)):
+def get_result(result_id: str):
     """Obtener un resultado específico"""
-    result = db.query(TestResult).filter(TestResult.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=404, detail="Result not found")
-    return result
+    try:
+        result = get_test_result(result_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Result not found")
+        return TestResultResponse(**result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error obteniendo resultado: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error obteniendo resultado: {str(e)}")
 
 @app.get("/api/results/recent/{hours}")
-def get_recent_results(hours: int = 24, db: Session = Depends(get_db)):
+def get_recent_results_endpoint(hours: int = 24):
     """Obtener resultados de las últimas N horas"""
-    since = datetime.utcnow() - timedelta(hours=hours)
-    results = db.query(TestResult).filter(
-        TestResult.timestamp >= since
-    ).order_by(TestResult.timestamp.desc()).all()
-    return results
+    try:
+        results = get_recent_results(hours=hours)
+        return [TestResultResponse(**r) for r in results]
+    except Exception as e:
+        print(f"❌ Error obteniendo resultados recientes: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error obteniendo resultados recientes: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

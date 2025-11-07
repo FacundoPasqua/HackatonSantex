@@ -43,6 +43,8 @@ playwright-report/
 # Credentials
 **/credentials/
 **/*credentials*.json
+firebase-credentials.json
+backend/firebase-credentials.json
 
 # Database
 *.db

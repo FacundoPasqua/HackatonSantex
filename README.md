@@ -82,9 +82,22 @@ Ver `QUICK_DEPLOY.md` para instrucciones detalladas.
 
 ## 📚 Documentación
 
+- `RAILWAY_DB_SETUP.md` - **Guía para configurar PostgreSQL en Railway** ⭐
+- `CONFIGURAR_TESTS_BD.md` - **Configurar tests para guardar en base de datos** ⭐
+- `SOLUCION_NO_GUARDA_BD.md` - **Solución si los tests no guardan en BD** 🔧
 - `QUICK_DEPLOY.md` - Guía rápida de deployment
 - `DEPLOYMENT.md` - Guía detallada con todas las opciones
 - `LOVABLE_INTEGRATION.md` - Cómo conectar con Lovable.dev
+
+## 🧪 Diagnóstico
+
+Si los tests no guardan en la base de datos, ejecuta:
+
+```bash
+node test-api-connection.js
+```
+
+Este script probará la conexión con tu API y te dirá qué está fallando.
 
 ## 📄 Licencia
 

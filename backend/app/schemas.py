@@ -21,7 +21,7 @@ class TestResultCreate(TestResultBase):
     pass
 
 class TestResultResponse(TestResultBase):
-    id: int
+    id: str  # Firestore usa strings para IDs
     timestamp: datetime
     
     class Config:
