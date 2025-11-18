@@ -20,10 +20,19 @@ connect_args = {}
 if "sqlite" in SQLALCHEMY_DATABASE_URL:
     connect_args = {"check_same_thread": False}
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args=connect_args
-)
+# Crear engine con pool_pre_ping para verificar conexiones
+try:
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        connect_args=connect_args,
+        pool_pre_ping=True,  # Verificar conexiones antes de usarlas
+        echo=False
+    )
+    print(f"[INFO] Database engine created successfully")
+    print(f"[INFO] Database URL: {SQLALCHEMY_DATABASE_URL[:50]}...")  # Solo primeros 50 chars por seguridad
+except Exception as e:
+    print(f"[ERROR] Failed to create database engine: {e}")
+    raise
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -33,15 +33,18 @@ from app.test_executor import (
 from pydantic import BaseModel
 
 # Crear tablas en la base de datos
+db_connected = False
 try:
+    print("[INFO] Attempting to connect to database...")
     Base.metadata.create_all(bind=engine)
     print("[OK] Database tables created successfully")
-    
-    
     db_connected = True
 except Exception as e:
     print(f"[WARNING] Could not create database tables: {e}")
-    print("The server will start but database operations may fail")
+    print(f"[WARNING] Error type: {type(e).__name__}")
+    import traceback
+    print(f"[WARNING] Traceback: {traceback.format_exc()}")
+    print("[WARNING] The server will start but database operations may fail")
     db_connected = False
 
 app = FastAPI(
