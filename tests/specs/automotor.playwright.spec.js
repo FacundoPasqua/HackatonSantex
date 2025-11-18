@@ -269,8 +269,8 @@ function validarRespuestaConPalabrasClave(respuesta, palabrasClave) {
 async function obtenerRespuestaBot(page, preguntaId) {
   let respuesta = '';
   let intentos = 0;
-  const maxIntentos = 20; // 20 intentos * 3 segundos = 60 segundos máximo
-  const intervaloEspera = 3000; // Esperar 3 segundos entre intentos (bot tarda ~25 seg)
+  const maxIntentos = 15; // 15 intentos * 5 segundos = 75 segundos máximo
+  const intervaloEspera = 5000; // Esperar 5 segundos entre intentos (bot tarda ~25 seg, reducir requests)
   let chatCerrado = false;
   
   while (intentos < maxIntentos && (!respuesta || respuesta.length < 5)) {
@@ -398,9 +398,9 @@ if (preguntas.length === 0) {
       await page.waitForLoadState('networkidle', { timeout: 30000 });
       console.log(`✅ [${p.id}] Página cargada correctamente`);
       
-      // Abrir el chat con timeout aumentado
-      await page.locator('button.chat-fab').waitFor({ state: 'visible', timeout: 30000 });
-      await page.locator('button.chat-fab').click({ timeout: 10000 });
+      // Abrir el chat con timeout aumentado a 60 segundos
+      await page.locator('button.chat-fab').waitFor({ state: 'visible', timeout: 60000 });
+      await page.locator('button.chat-fab').click({ timeout: 15000 });
       console.log(`✅ [${p.id}] Chat abierto`);
 
       const input = page.locator('input.message-input');
