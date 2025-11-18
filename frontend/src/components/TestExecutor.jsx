@@ -10,8 +10,8 @@ function TestExecutor() {
   const [selectedEnvironment, setSelectedEnvironment] = useState('preprod') // 'test', 'dev', 'preprod'
   
   const environments = {
-    test: { name: 'TEST', url: 'https://test.rentascordoba.gob.ar/bot-web' },
-    dev: { name: 'DEV', url: 'https://desa.rentascordoba.gob.ar/bot-web' },
+    test: { name: 'Test', url: 'https://test.rentascordoba.gob.ar/bot-web' },
+    dev: { name: 'Dev', url: 'https://desa.rentascordoba.gob.ar/bot-web' },
     preprod: { name: 'PreProd', url: 'https://preprod.rentascordoba.gob.ar/bot-web' }
   }
 
