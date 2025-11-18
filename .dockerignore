@@ -20,4 +20,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+# NO ignorar package.json - es necesario para el build
+!package.json
 
