@@ -584,11 +584,43 @@ def start_test_execution(test_type: str, environment: str = "preprod") -> str:
     
     print(f"[INFO] Test {test_id} creado y guardado en BD", flush=True)
     
-    # Ejecutar en thread separado
-    thread = threading.Thread(target=run_test_async, args=(test_type, test_id, environment), daemon=True)
+    # Ejecutar en thread separado con mejor manejo de errores
+    def run_with_error_handling():
+        try:
+            run_test_async(test_type, test_id, environment)
+        except Exception as e:
+            print(f"[ERROR] Excepcion no capturada en thread para {test_id}: {str(e)}", flush=True)
+            import traceback
+            print(f"[ERROR] Traceback: {traceback.format_exc()}", flush=True)
+            # Intentar actualizar estado a error
+            try:
+                update_test_status(test_id, {
+                    "status": "error",
+                    "error": f"Error no capturado en thread: {str(e)}",
+                    "completed_at": datetime.utcnow().isoformat()
+                })
+            except:
+                pass
+    
+    thread = threading.Thread(target=run_with_error_handling, daemon=True)
     thread.start()
     
     print(f"[INFO] Thread iniciado para test {test_id}", flush=True)
+    
+    # Verificar que el thread realmente se inició después de un breve delay
+    import time
+    time.sleep(0.5)
+    if not thread.is_alive():
+        print(f"[WARNING] Thread para {test_id} no esta vivo despues de iniciarse", flush=True)
+        # Intentar actualizar estado a error
+        try:
+            update_test_status(test_id, {
+                "status": "error",
+                "error": "Thread no se inicio correctamente",
+                "completed_at": datetime.utcnow().isoformat()
+            })
+        except:
+            pass
     
     return test_id
 
