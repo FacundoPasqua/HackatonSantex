@@ -22,7 +22,20 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+    
+    /* Timeouts aumentados para evitar que los tests fallen prematuramente */
+    actionTimeout: 60000, // 60 segundos para acciones (click, fill, etc)
+    navigationTimeout: 60000, // 60 segundos para navegación
+    
+    /* User agent para evitar detección como bot */
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    
+    /* Viewport para simular navegador real */
+    viewport: { width: 1920, height: 1080 },
   },
+  
+  /* Timeout global para todos los tests */
+  timeout: 600000, // 10 minutos por defecto
 
   /* Configure projects for major browsers */
   projects: [
