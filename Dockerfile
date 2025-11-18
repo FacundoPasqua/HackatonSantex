@@ -11,12 +11,11 @@ RUN apt-get update && apt-get install -y \
 # Verificar instalación
 RUN node --version && npm --version
 
-# Copiar package.json primero para cachear dependencias
+# Copiar todo el código primero
 WORKDIR /app
-COPY package.json ./
+COPY . .
 
 # Instalar dependencias de Node.js (incluyendo devDependencies para Playwright)
-# Si no hay package-lock.json, npm install lo creará
 RUN npm install --include=dev
 
 # Instalar Playwright y browsers (solo chromium para ahorrar espacio)
@@ -24,12 +23,7 @@ RUN npx playwright install --with-deps chromium
 
 # Instalar dependencias de Python
 WORKDIR /app/backend
-COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Copiar todo el código (después de instalar dependencias para mejor cache)
-WORKDIR /app
-COPY . .
 
 # Exponer puerto
 EXPOSE 8000
