@@ -37,6 +37,7 @@ async function guardarResultadoEnBD(resultado) {
     };
 
     console.log(`🔗 [${resultado.id}] Intentando guardar en: ${API_URL}/api/results`);
+    console.log(`📦 [${resultado.id}] Payload:`, JSON.stringify(payload, null, 2));
     
     const response = await fetch(`${API_URL}/api/results`, {
       method: 'POST',
@@ -47,17 +48,22 @@ async function guardarResultadoEnBD(resultado) {
       signal: AbortSignal.timeout(30000) // Aumentado a 30 segundos
     });
 
+    console.log(`📡 [${resultado.id}] Response status: ${response.status} ${response.statusText}`);
+
     if (response.ok) {
       const data = await response.json();
       console.log(`💾 [${resultado.id}] Resultado guardado en BD: ID ${data.id}`);
       return true;
     } else {
       const errorText = await response.text();
-      console.warn(`⚠️ [${resultado.id}] Error guardando en BD: ${response.status} - ${errorText}`);
+      console.error(`❌ [${resultado.id}] Error guardando en BD: ${response.status} - ${errorText}`);
+      console.error(`❌ [${resultado.id}] URL completa: ${API_URL}/api/results`);
       return false;
     }
   } catch (error) {
-    console.warn(`⚠️ [${resultado.id}] No se pudo guardar en BD:`, error.message);
+    console.error(`❌ [${resultado.id}] Excepcion al guardar en BD:`, error.message);
+    console.error(`❌ [${resultado.id}] Stack:`, error.stack);
+    console.error(`❌ [${resultado.id}] API_URL configurada: ${API_URL}`);
     return false;
   }
 }
