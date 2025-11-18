@@ -394,16 +394,17 @@ if (preguntas.length === 0) {
     try {
       // Navegar a la página
       console.log(`🌐 [${p.id}] Navegando a: ${BOT_URL}`);
-      await page.goto(BOT_URL);
-      await page.waitForLoadState('networkidle');
+      await page.goto(BOT_URL, { waitUntil: 'networkidle', timeout: 60000 });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
       console.log(`✅ [${p.id}] Página cargada correctamente`);
       
-      // Abrir el chat
-      await page.locator('button.chat-fab').click();
+      // Abrir el chat con timeout aumentado
+      await page.locator('button.chat-fab').waitFor({ state: 'visible', timeout: 30000 });
+      await page.locator('button.chat-fab').click({ timeout: 10000 });
       console.log(`✅ [${p.id}] Chat abierto`);
 
       const input = page.locator('input.message-input');
-      await input.waitFor({ state: 'visible' });
+      await input.waitFor({ state: 'visible', timeout: 30000 });
       console.log(`✅ [${p.id}] Input del chat visible`);
 
       // Limpiar mensajes previos
@@ -470,9 +471,14 @@ if (preguntas.length === 0) {
 
     } catch (error) {
       console.error(`❌ [${p.id}] Error ejecutando pregunta:`, error.message);
+      console.error(`❌ [${p.id}] Stack trace:`, error.stack);
       resultado.respuesta = 'ERROR_EJECUCION';
       resultado.resultadoFinal = 'FAIL';
       resultado.error = error.message;
+      // Asegurar que el tiempo se calcule incluso si hay error
+      if (resultado.tiempo === '0') {
+        resultado.tiempo = '0.01'; // Tiempo mínimo para indicar que se intentó
+      }
     }
 
     // Guardar resultado en Google Sheets
@@ -505,17 +511,24 @@ if (preguntas.length === 0) {
       console.warn(`❌ [${p.id}] No se pudo guardar resultado:`, err.message);
     }
 
-    // Guardar también en la base de datos Python
+    // Guardar también en la base de datos Python (SIEMPRE, incluso si hay error)
     try {
-      const environment = isLocalhost ? 'localhost' : isPreprod ? 'preprod' : 'test';
-      await guardarResultadoEnBD({
+      const environment = isLocalhost ? 'localhost' : isPreprod ? 'preprod' : isTest ? 'test' : 'dev';
+      const guardado = await guardarResultadoEnBD({
         ...resultado,
         testType: 'automotor',
         environment: environment,
         sheetName: SHEET_NAME
       });
+      if (guardado) {
+        console.log(`✅ [${p.id}] Resultado guardado en BD Python`);
+      } else {
+        console.warn(`⚠️ [${p.id}] No se pudo guardar en BD Python (guardarResultadoEnBD retornó false)`);
+      }
     } catch (err) {
-      console.warn(`❌ [${p.id}] No se pudo guardar en BD Python:`, err.message);
+      console.error(`❌ [${p.id}] Error crítico guardando en BD Python:`, err.message);
+      console.error(`❌ [${p.id}] Stack trace:`, err.stack);
+      // No lanzar el error, solo loguearlo para que el test continúe
     }
 
     console.log(`🏁 [${p.id}] FINALIZADA - RESULTADO: ${resultado.resultadoFinal}`);
