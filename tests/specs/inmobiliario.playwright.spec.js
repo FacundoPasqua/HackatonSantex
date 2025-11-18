@@ -271,7 +271,7 @@ async function obtenerRespuestaBot(page, preguntaId) {
   let chatCerrado = false;
   
   while (intentos < maxIntentos && (!respuesta || respuesta.length < 5)) {
-    await page.waitForTimeout(intervaloEspera); // Esperar 3 segundos entre intentos
+    await page.waitForTimeout(intervaloEspera); // Esperar 5 segundos entre intentos
     intentos++;
     
     try {
