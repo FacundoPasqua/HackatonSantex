@@ -20,7 +20,4 @@ Thumbs.db
 *.swp
 *.swo
 *~
-# NO ignorar archivos necesarios para el build
-!package.json
-!backend/requirements.txt
 

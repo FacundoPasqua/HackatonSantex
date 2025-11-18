@@ -11,15 +11,18 @@ RUN apt-get update && apt-get install -y \
 # Verificar instalación
 RUN node --version && npm --version
 
-# Copiar todo el código primero
+# Copiar package.json primero (antes de copiar todo para mejor cache)
 WORKDIR /app
-COPY . .
+COPY package.json ./
 
 # Instalar dependencias de Node.js (incluyendo devDependencies para Playwright)
 RUN npm install --include=dev
 
 # Instalar Playwright y browsers (solo chromium para ahorrar espacio)
 RUN npx playwright install --with-deps chromium
+
+# Copiar el resto del código
+COPY . .
 
 # Instalar dependencias de Python
 WORKDIR /app/backend
