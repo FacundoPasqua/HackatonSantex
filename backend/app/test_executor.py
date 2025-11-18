@@ -215,6 +215,20 @@ def run_test_async(test_type: str, test_id: str):
         
         print(f"[INFO] Ejecutando desde: {work_dir}", flush=True)
         
+        # Obtener API_URL para pasarla a los tests
+        # Railway puede tener RAILWAY_PUBLIC_DOMAIN o podemos construirla
+        api_url = os.getenv("API_URL")
+        if not api_url:
+            # Intentar construir desde Railway
+            railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+            if railway_domain:
+                api_url = f"https://{railway_domain}"
+            else:
+                # Fallback: usar localhost en desarrollo
+                api_url = "http://localhost:8000"
+        
+        print(f"[INFO] API_URL para tests: {api_url}", flush=True)
+        
         # Determinar el comando npm según el sistema operativo
         import platform
         import shutil
@@ -238,6 +252,14 @@ def run_test_async(test_type: str, test_id: str):
         print(f"[INFO] Ejecutando: {npm_path} {test_command}", flush=True)
         print(f"[INFO] Usando shell: {use_shell}", flush=True)
         
+        # Preparar variables de entorno para el proceso
+        env = os.environ.copy()
+        env["API_URL"] = api_url
+        # También pasar BOT_URL si existe
+        bot_url = os.getenv("BOT_URL")
+        if bot_url:
+            env["BOT_URL"] = bot_url
+        
         # Ejecutar test
         if use_shell:
             # En Windows, usar shell=True y el comando completo
@@ -251,7 +273,8 @@ def run_test_async(test_type: str, test_id: str):
                 errors='replace',  # Reemplazar caracteres inválidos en lugar de fallar
                 text=True,
                 universal_newlines=True,
-                shell=True
+                shell=True,
+                env=env  # Pasar variables de entorno
             )
         else:
             # En Linux/Mac, usar lista de argumentos
@@ -264,7 +287,8 @@ def run_test_async(test_type: str, test_id: str):
                 errors='replace',
                 text=True,
                 universal_newlines=True,
-                shell=False
+                shell=False,
+                env=env  # Pasar variables de entorno
             )
         
         # Guardar proceso para poder cancelarlo
