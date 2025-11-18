@@ -347,6 +347,46 @@ def cancel_test_endpoint(test_id: str):
         print(f"[ERROR] Error cancelando test: {str(e)}", flush=True)
         raise HTTPException(status_code=500, detail=f"Error cancelando test: {str(e)}")
 
+@app.post("/api/tests/cleanup-stuck")
+def cleanup_stuck_tests_endpoint():
+    """Limpiar tests que quedaron en 'queued' por más de 5 minutos"""
+    try:
+        from app.test_executor import get_test_status, update_test_status, get_running_tests
+        from datetime import datetime, timedelta
+        
+        print(f"[REQUEST] POST /api/tests/cleanup-stuck", flush=True)
+        
+        running_tests = get_running_tests()
+        cleaned_count = 0
+        five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
+        
+        for test_id in running_tests:
+            status = get_test_status(test_id)
+            if status and status.get("status") == "queued":
+                created_at_str = status.get("created_at")
+                if created_at_str:
+                    try:
+                        created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                        if created_at < five_minutes_ago:
+                            # Test en queued por más de 5 minutos, marcarlo como error
+                            update_test_status(test_id, {
+                                "status": "error",
+                                "error": "Test quedó en cola por más de 5 minutos sin ejecutarse",
+                                "completed_at": datetime.utcnow().isoformat()
+                            })
+                            cleaned_count += 1
+                            print(f"[INFO] Limpiado test stuck: {test_id}", flush=True)
+                    except Exception as e:
+                        print(f"[WARNING] Error procesando test {test_id}: {str(e)}", flush=True)
+        
+        print(f"[OK] POST /api/tests/cleanup-stuck - Limpiados {cleaned_count} tests", flush=True)
+        return {"message": f"Limpiados {cleaned_count} tests atascados", "cleaned_count": cleaned_count}
+    except Exception as e:
+        print(f"[ERROR] Error limpiando tests: {str(e)}", flush=True)
+        import traceback
+        print(f"[ERROR] Traceback: {traceback.format_exc()}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error limpiando tests: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

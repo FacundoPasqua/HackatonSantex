@@ -171,6 +171,8 @@ def run_test_async(test_type: str, test_id: str, environment: str = "preprod"):
     Ejecutar test en segundo plano
     """
     try:
+        print(f"[INFO] ===== INICIANDO run_test_async para {test_id} =====", flush=True)
+        
         # Verificar que el test_id existe en BD
         current_status = get_test_status(test_id)
         if not current_status:
@@ -451,11 +453,16 @@ def run_test_async(test_type: str, test_id: str, environment: str = "preprod"):
             del active_processes[test_id]
         print(f"[ERROR] Test {test_id} timeout", flush=True)
     except Exception as e:
-        update_test_status(test_id, {
-            "status": "error",
-            "error": str(e),
-            "completed_at": datetime.utcnow().isoformat()
-        })
+        # Asegurar que el estado se actualice incluso si hay un error temprano
+        try:
+            update_test_status(test_id, {
+                "status": "error",
+                "error": str(e),
+                "completed_at": datetime.utcnow().isoformat()
+            })
+        except Exception as update_error:
+            print(f"[ERROR] Error actualizando estado después de excepción: {str(update_error)}", flush=True)
+        
         if test_id in active_processes:
             del active_processes[test_id]
         print(f"[ERROR] Error ejecutando test {test_id}: {str(e)}", flush=True)
