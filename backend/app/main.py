@@ -263,6 +263,7 @@ def get_test_bases_endpoint():
 
 class TestRunRequest(BaseModel):
     test_type: str
+    environment: Optional[str] = "preprod"
 
 @app.post("/api/tests/run")
 def run_test_endpoint(request: TestRunRequest):
@@ -270,23 +271,30 @@ def run_test_endpoint(request: TestRunRequest):
     try:
         req = request
         test_type = req.test_type
-        print(f"[REQUEST] POST /api/tests/run - test_type: {test_type}", flush=True)
+        environment = req.environment or "preprod"
+        print(f"[REQUEST] POST /api/tests/run - test_type: {test_type}, environment: {environment}", flush=True)
         
         # Validar test_type
         valid_types = ["automotor", "inmobiliario", "embarcaciones"]
         if test_type not in valid_types:
             raise HTTPException(status_code=400, detail=f"test_type debe ser uno de: {valid_types}")
         
-        # Iniciar ejecución
-        test_id = start_test_execution(test_type)
+        # Validar environment
+        valid_environments = ["test", "dev", "preprod"]
+        if environment not in valid_environments:
+            raise HTTPException(status_code=400, detail=f"environment debe ser uno de: {valid_environments}")
         
-        print(f"[OK] POST /api/tests/run - Test {test_id} iniciado", flush=True)
+        # Iniciar ejecución
+        test_id = start_test_execution(test_type, environment)
+        
+        print(f"[OK] POST /api/tests/run - Test {test_id} iniciado en ambiente {environment}", flush=True)
         
         return {
             "test_id": test_id,
             "test_type": test_type,
+            "environment": environment,
             "status": "queued",
-            "message": f"Test de {test_type} iniciado"
+            "message": f"Test de {test_type} iniciado en ambiente {environment}"
         }
     except HTTPException:
         raise

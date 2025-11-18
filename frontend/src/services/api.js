@@ -52,8 +52,11 @@ export const getTestBases = async () => {
   return response.data
 }
 
-export const runTest = async (testType) => {
-  const response = await api.post('/api/tests/run', { test_type: testType })
+export const runTest = async (testType, environment = 'preprod') => {
+  const response = await api.post('/api/tests/run', { 
+    test_type: testType,
+    environment: environment
+  })
   return response.data
 }
 

@@ -166,7 +166,7 @@ def update_test_status(test_id: str, status_data: Dict):
     finally:
         db.close()
 
-def run_test_async(test_type: str, test_id: str):
+def run_test_async(test_type: str, test_id: str, environment: str = "preprod"):
     """
     Ejecutar test en segundo plano
     """
@@ -255,10 +255,25 @@ def run_test_async(test_type: str, test_id: str):
         # Preparar variables de entorno para el proceso
         env = os.environ.copy()
         env["API_URL"] = api_url
-        # También pasar BOT_URL si existe
-        bot_url = os.getenv("BOT_URL")
-        if bot_url:
-            env["BOT_URL"] = bot_url
+        
+        # Obtener BOT_URL desde el parámetro environment o variable de entorno
+        # Mapeo de ambientes a URLs
+        environment_urls = {
+            "test": "https://test.rentascordoba.gob.ar/bot-web",
+            "dev": "https://desa.rentascordoba.gob.ar/bot-web",
+            "preprod": "https://preprod.rentascordoba.gob.ar/bot-web"
+        }
+        
+        # Usar el environment pasado como parámetro
+        bot_url = environment_urls.get(environment, environment_urls["preprod"])
+        
+        # Si hay BOT_URL en variables de entorno, usarla (tiene prioridad)
+        env_bot_url = os.getenv("BOT_URL")
+        if env_bot_url:
+            bot_url = env_bot_url
+        
+        env["BOT_URL"] = bot_url
+        print(f"[INFO] BOT_URL para tests: {bot_url}", flush=True)
         
         # Ejecutar test
         if use_shell:
@@ -538,7 +553,7 @@ def cancel_test_execution(test_id: str) -> bool:
         print(f"[ERROR] Traceback: {traceback.format_exc()}", flush=True)
         return False
 
-def start_test_execution(test_type: str) -> str:
+def start_test_execution(test_type: str, environment: str = "preprod") -> str:
     """
     Iniciar ejecución de un test
     Retorna el ID de la ejecución
@@ -563,7 +578,7 @@ def start_test_execution(test_type: str) -> str:
     print(f"[INFO] Test {test_id} creado y guardado en BD", flush=True)
     
     # Ejecutar en thread separado
-    thread = threading.Thread(target=run_test_async, args=(test_type, test_id), daemon=True)
+    thread = threading.Thread(target=run_test_async, args=(test_type, test_id, environment), daemon=True)
     thread.start()
     
     print(f"[INFO] Thread iniciado para test {test_id}", flush=True)

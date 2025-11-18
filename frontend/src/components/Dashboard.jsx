@@ -35,6 +35,16 @@ function Dashboard() {
     loadRecentResults()
   }, [])
 
+  // Actualización automática cada 10 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData()
+      loadRecentResults()
+    }, 10000) // Actualizar cada 10 segundos
+
+    return () => clearInterval(interval)
+  }, [filters, pagination.page, pagination.limit])
+
   const loadData = async () => {
     setLoading(true)
     setError(null)

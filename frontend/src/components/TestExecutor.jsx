@@ -7,6 +7,13 @@ function TestExecutor() {
   const [loading, setLoading] = useState(true)
   const [runningTests, setRunningTests] = useState({}) // { test_type: { test_id, status, progress } }
   const [anyTestRunning, setAnyTestRunning] = useState(false)
+  const [selectedEnvironment, setSelectedEnvironment] = useState('preprod') // 'test', 'dev', 'preprod'
+  
+  const environments = {
+    test: { name: 'TEST', url: 'https://test.rentascordoba.gob.ar/bot-web' },
+    dev: { name: 'DEV', url: 'https://desa.rentascordoba.gob.ar/bot-web' },
+    preprod: { name: 'PreProd', url: 'https://preprod.rentascordoba.gob.ar/bot-web' }
+  }
 
   useEffect(() => {
     loadBases()
@@ -79,7 +86,7 @@ function TestExecutor() {
     }
     
     try {
-      const result = await runTest(testType)
+      const result = await runTest(testType, selectedEnvironment)
       setAnyTestRunning(true)
       setRunningTests(prev => ({
         ...prev,
@@ -152,9 +159,25 @@ function TestExecutor() {
 
   const calculateProgress = (status) => {
     // Calcular progreso basado en logs o tiempo transcurrido
-    if (!status || !status.started_at) {
-      // Si está en cola, mostrar 0%
-      if (status && status.status === 'queued') return 0
+    if (!status) {
+      return 0
+    }
+    
+    // Si está en cola, mostrar 0%
+    if (status.status === 'queued') {
+      return 0
+    }
+    
+    // Si está completado, falló, o cancelado, mostrar 100% o 0%
+    if (status.status === 'completed') {
+      return 100
+    }
+    if (status.status === 'failed' || status.status === 'error' || status.status === 'timeout' || status.status === 'cancelled') {
+      return 0
+    }
+    
+    // Si está corriendo, calcular basado en tiempo
+    if (!status.started_at) {
       return 0
     }
     
@@ -164,6 +187,7 @@ function TestExecutor() {
       
       // Verificar que las fechas sean válidas
       if (isNaN(started.getTime()) || isNaN(now.getTime())) {
+        console.warn('Fechas inválidas en calculateProgress:', { started_at: status.started_at, now })
         return 0
       }
       
@@ -171,20 +195,28 @@ function TestExecutor() {
       
       // Si el tiempo transcurrido es negativo, retornar 0
       if (elapsed < 0) {
+        console.warn('Tiempo transcurrido negativo:', elapsed)
         return 0
       }
       
       // Progreso estimado basado en tiempo (máximo 95% hasta que termine)
       const base = bases.find(b => b.id === status.test_type)
-      if (base) {
-        const estimated = base.estimated_time_minutes || 20
-        // Si ya pasó el tiempo estimado, mostrar 95% (no 100% hasta que termine)
+      if (base && base.estimated_time_minutes) {
+        const estimated = base.estimated_time_minutes
+        // Calcular progreso: (tiempo transcurrido / tiempo estimado) * 100
         const progress = Math.min(95, (elapsed / estimated) * 100)
-        return Math.max(0, Math.round(progress)) // Asegurar que no sea negativo
+        const rounded = Math.max(0, Math.round(progress)) // Asegurar que no sea negativo
+        console.log(`Progreso calculado: ${rounded}% (${elapsed.toFixed(2)} min / ${estimated} min)`)
+        return rounded
       }
-      return 0
+      
+      // Si no hay base o tiempo estimado, usar progreso mínimo basado en tiempo
+      // Asumir 20 minutos por defecto
+      const defaultEstimated = 20
+      const progress = Math.min(95, (elapsed / defaultEstimated) * 100)
+      return Math.max(0, Math.round(progress))
     } catch (err) {
-      console.error('Error calculando progreso:', err)
+      console.error('Error calculando progreso:', err, status)
       return 0
     }
   }
@@ -230,6 +262,30 @@ function TestExecutor() {
       <p className="test-executor-description">
         Selecciona una base de datos y ejecuta las pruebas. Los resultados se guardarán automáticamente.
       </p>
+
+      <div className="environment-selector">
+        <label htmlFor="environment-select" className="environment-label">
+          🌐 Ambiente:
+        </label>
+        <select
+          id="environment-select"
+          value={selectedEnvironment}
+          onChange={(e) => setSelectedEnvironment(e.target.value)}
+          disabled={anyTestRunning}
+          className="environment-select"
+        >
+          {Object.entries(environments).map(([key, env]) => (
+            <option key={key} value={key}>
+              {env.name}
+            </option>
+          ))}
+        </select>
+        {environments[selectedEnvironment] && (
+          <span className="environment-url">
+            {environments[selectedEnvironment].url}
+          </span>
+        )}
+      </div>
 
       <div className="test-bases-grid">
         {bases.map(base => {
