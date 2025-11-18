@@ -5,14 +5,19 @@ import XLSX from 'xlsx';
 import dotenv from 'dotenv';
 import { guardarResultadoEnBD } from '../../utils/api_client.js';
 
-// Cargar variables de entorno desde config.env
-dotenv.config({ path: './config.env' });
+// Cargar variables de entorno desde config.env (en la raíz del proyecto)
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// Buscar config.env en la raíz del proyecto (subir 2 niveles desde tests/specs/)
+dotenv.config({ path: join(__dirname, '../../config.env') });
 
 // CONFIG
 const INPUT_FILE = './tests/data/Embarcaciones.xlsx';
 const CREDENTIALS_PATH = './tests/credentials/google-credentials.json';
 const SPREADSHEET_ID = '1WDfRvcEgJ56wrCaRnAvZC390v39OtWpB8EyhmwjGtm4'; // tu ID
-const BOT_URL = process.env.BOT_URL || 'https://test.rentascordoba.gob.ar/bot-web';
+const BOT_URL = process.env.BOT_URL || 'https://preprod.rentascordoba.gob.ar/bot-web';
 const MAX_PREGUNTAS = 1000; // Procesar todas las preguntas disponibles
 const BLOQUEO_TEXT = 'Lo siento, no puedo procesar tu mensaje';
 const TAMANO_LOTE = 2; // Número de preguntas a procesar simultáneamente
@@ -201,24 +206,43 @@ function esMensajeErrorGenerico(respuesta) {
   return patronesError.some(patron => patron.test(respuestaLimpia));
 }
 
+// Función para detectar si la respuesta es un mensaje de "no encontrado"
+function esMensajeNoEncontrado(respuesta) {
+  if (!respuesta || respuesta.length < 10) {
+    return false;
+  }
+  
+  const respuestaLimpia = respuesta.replace(/^RC\s*/, '').trim();
+  
+  // Detectar si el mensaje empieza con "No pude encontrar información específica"
+  return /^no pude encontrar información específica/i.test(respuestaLimpia);
+}
+
 // Función para validar si la respuesta contiene alguna de las palabras clave
 function validarRespuestaConPalabrasClave(respuesta, palabrasClave) {
   if (!respuesta || respuesta.length < 5) {
-    return { esCorrecta: false, palabrasEncontradas: [], tieneJSON: false, tieneErrorGenerico: false };
+    return { esCorrecta: false, palabrasEncontradas: [], tieneJSON: false, tieneErrorGenerico: false, tieneNoEncontrado: false };
   }
   
   // Si la respuesta contiene JSON crudo, siempre es un error (fallar validación)
   const tieneJSON = contieneJSONCrudo(respuesta);
   if (tieneJSON) {
     console.log(`❌ ERROR CRÍTICO: Respuesta contiene JSON crudo - "${respuesta.substring(0, 100)}..."`);
-    return { esCorrecta: false, palabrasEncontradas: [], tieneJSON: true, tieneErrorGenerico: false };
+    return { esCorrecta: false, palabrasEncontradas: [], tieneJSON: true, tieneErrorGenerico: false, tieneNoEncontrado: false };
   }
   
   // Si la respuesta es un mensaje de error genérico, siempre es un error (fallar validación)
   const esErrorGenerico = esMensajeErrorGenerico(respuesta);
   if (esErrorGenerico) {
     console.log(`❌ ERROR: Respuesta es mensaje de error genérico del bot - "${respuesta.substring(0, 100)}..."`);
-    return { esCorrecta: false, palabrasEncontradas: [], tieneJSON: false, tieneErrorGenerico: true };
+    return { esCorrecta: false, palabrasEncontradas: [], tieneJSON: false, tieneErrorGenerico: true, tieneNoEncontrado: false };
+  }
+  
+  // Si la respuesta es un mensaje de "no encontrado", siempre es un error (fallar validación)
+  const esNoEncontrado = esMensajeNoEncontrado(respuesta);
+  if (esNoEncontrado) {
+    console.log(`❌ ERROR: Respuesta es mensaje de "no encontrado" - "${respuesta.substring(0, 100)}..."`);
+    return { esCorrecta: false, palabrasEncontradas: [], tieneJSON: false, tieneErrorGenerico: false, tieneNoEncontrado: true };
   }
   
   // Limpiar la respuesta (quitar prefijo RC si existe)
@@ -238,7 +262,7 @@ function validarRespuestaConPalabrasClave(respuesta, palabrasClave) {
   // La validación es exitosa si al menos una palabra clave está presente
   const esCorrecta = palabrasEncontradas.length > 0;
   
-  return { esCorrecta, palabrasEncontradas, tieneJSON: false, tieneErrorGenerico: false };
+  return { esCorrecta, palabrasEncontradas, tieneJSON: false, tieneErrorGenerico: false, tieneNoEncontrado: false };
 }
 
 // Función para obtener la respuesta del bot con manejo de errores mejorado
@@ -427,6 +451,7 @@ if (preguntas.length === 0) {
         resultado.palabrasEncontradas = validacion.palabrasEncontradas.join(', ');
         resultado.resultadoFinal = validacion.tieneJSON ? 'FAIL (JSON)' : 
                                     validacion.tieneErrorGenerico ? 'FAIL (ERROR GENÉRICO)' : 
+                                    validacion.tieneNoEncontrado ? 'FAIL (NO ENCONTRADO)' :
                                     (validacion.esCorrecta ? 'PASS' : 'FAIL');
         
         console.log(`📥 [${p.id}] Respuesta: "${respuestaData.respuesta.substring(0, 80)}..."`);
@@ -434,6 +459,8 @@ if (preguntas.length === 0) {
           console.log(`❌ [${p.id}] ERROR CRÍTICO: Respuesta contiene JSON crudo`);
         } else if (validacion.tieneErrorGenerico) {
           console.log(`❌ [${p.id}] ERROR: Respuesta es mensaje de error genérico del bot`);
+        } else if (validacion.tieneNoEncontrado) {
+          console.log(`❌ [${p.id}] ERROR: Respuesta es mensaje de "no encontrado"`);
         } else {
           console.log(`🎯 [${p.id}] Palabras encontradas: ${validacion.palabrasEncontradas.join(', ')}`);
           console.log(`✅ [${p.id}] Validación: ${validacion.esCorrecta ? 'PASS' : 'FAIL'}`);

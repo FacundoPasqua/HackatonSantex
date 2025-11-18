@@ -9,8 +9,8 @@ from datetime import datetime
 import os
 import traceback
 
-from app.database import engine
-from app.models import Base
+from app.database import engine, SessionLocal
+from app.models import Base, TestExecution
 from app.db_models import (
     create_test_result,
     get_test_result,
@@ -23,11 +23,21 @@ from app.schemas import (
     TestResultCreate, TestResultResponse, 
     StatisticsResponse, SummaryResponse
 )
+from app.test_executor import (
+    get_test_bases, 
+    start_test_execution, 
+    get_test_status,
+    get_running_tests,
+    cancel_test_execution
+)
+from pydantic import BaseModel
 
 # Crear tablas en la base de datos
 try:
     Base.metadata.create_all(bind=engine)
     print("[OK] Database tables created successfully")
+    
+    
     db_connected = True
 except Exception as e:
     print(f"[WARNING] Could not create database tables: {e}")
@@ -127,7 +137,7 @@ def create_result(result: TestResultCreate):
         data = result.dict()
         data["timestamp"] = datetime.utcnow()
         
-        # Crear en Firestore
+        # Crear en PostgreSQL
         created = create_test_result(data)
         
         print(f"[OK] Resultado guardado: ID {created['id']}", flush=True)
@@ -237,6 +247,94 @@ def get_recent_results_endpoint(hours: int = 24):
     except Exception as e:
         print(f"[ERROR] Error obteniendo resultados recientes: {str(e)}", flush=True)
         raise HTTPException(status_code=500, detail=f"Error obteniendo resultados recientes: {str(e)}")
+
+@app.get("/api/tests/bases")
+def get_test_bases_endpoint():
+    """Obtener lista de bases de datos disponibles para testing"""
+    try:
+        bases = get_test_bases()
+        return {"bases": bases}
+    except Exception as e:
+        print(f"[ERROR] Error obteniendo bases: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error obteniendo bases: {str(e)}")
+
+class TestRunRequest(BaseModel):
+    test_type: str
+
+@app.post("/api/tests/run")
+def run_test_endpoint(request: TestRunRequest):
+    """Iniciar ejecución de un test"""
+    try:
+        req = request
+        test_type = req.test_type
+        print(f"[REQUEST] POST /api/tests/run - test_type: {test_type}", flush=True)
+        
+        # Validar test_type
+        valid_types = ["automotor", "inmobiliario", "embarcaciones"]
+        if test_type not in valid_types:
+            raise HTTPException(status_code=400, detail=f"test_type debe ser uno de: {valid_types}")
+        
+        # Iniciar ejecución
+        test_id = start_test_execution(test_type)
+        
+        print(f"[OK] POST /api/tests/run - Test {test_id} iniciado", flush=True)
+        
+        return {
+            "test_id": test_id,
+            "test_type": test_type,
+            "status": "queued",
+            "message": f"Test de {test_type} iniciado"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error iniciando test: {str(e)}", flush=True)
+        import traceback
+        print(f"[ERROR] Traceback: {traceback.format_exc()}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error iniciando test: {str(e)}")
+
+@app.get("/api/tests/status/{test_id}")
+def get_test_status_endpoint(test_id: str):
+    """Obtener estado de una ejecución de test"""
+    try:
+        print(f"[REQUEST] GET /api/tests/status/{test_id}", flush=True)
+        status = get_test_status(test_id)
+        if not status:
+            print(f"[WARNING] Test {test_id} no encontrado", flush=True)
+            raise HTTPException(status_code=404, detail=f"Test execution not found: {test_id}")
+        print(f"[OK] GET /api/tests/status/{test_id} - Status: 200", flush=True)
+        return status
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error obteniendo estado: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error obteniendo estado: {str(e)}")
+
+@app.get("/api/tests/running")
+def get_running_tests_endpoint():
+    """Obtener lista de tests que están corriendo o en cola"""
+    try:
+        running = get_running_tests()
+        return {"running_tests": running, "count": len(running)}
+    except Exception as e:
+        print(f"[ERROR] Error obteniendo tests corriendo: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error obteniendo tests corriendo: {str(e)}")
+
+@app.post("/api/tests/cancel/{test_id}")
+def cancel_test_endpoint(test_id: str):
+    """Cancelar ejecución de un test"""
+    try:
+        print(f"[REQUEST] POST /api/tests/cancel/{test_id}", flush=True)
+        success = cancel_test_execution(test_id)
+        if not success:
+            raise HTTPException(status_code=400, detail="No se pudo cancelar el test. Puede que no esté corriendo o ya haya terminado.")
+        print(f"[OK] POST /api/tests/cancel/{test_id} - Test cancelado", flush=True)
+        return {"message": f"Test {test_id} cancelado exitosamente", "test_id": test_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error cancelando test: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error cancelando test: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

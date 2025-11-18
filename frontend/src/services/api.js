@@ -47,5 +47,30 @@ export const getRecentResults = async (hours = 24) => {
   return response.data
 }
 
+export const getTestBases = async () => {
+  const response = await api.get('/api/tests/bases')
+  return response.data
+}
+
+export const runTest = async (testType) => {
+  const response = await api.post('/api/tests/run', { test_type: testType })
+  return response.data
+}
+
+export const getTestStatus = async (testId) => {
+  const response = await api.get(`/api/tests/status/${testId}`)
+  return response.data
+}
+
+export const getRunningTests = async () => {
+  const response = await api.get('/api/tests/running')
+  return response.data
+}
+
+export const cancelTest = async (testId) => {
+  const response = await api.post(`/api/tests/cancel/${testId}`)
+  return response.data
+}
+
 export default api
 

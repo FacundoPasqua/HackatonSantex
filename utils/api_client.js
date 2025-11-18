@@ -2,7 +2,17 @@
  * Cliente para enviar resultados de tests a la API Python
  */
 
+// API_URL se carga desde config.env en los tests
+// Los tests cargan dotenv antes de importar este módulo
 const API_URL = process.env.API_URL || 'http://localhost:8000';
+
+// Log para debug - mostrar qué URL se está usando
+if (process.env.API_URL) {
+  console.log(`🔍 [api_client] API_URL configurada: ${API_URL}`);
+} else {
+  console.warn(`⚠️ [api_client] API_URL no configurada, usando default: ${API_URL}`);
+  console.warn(`   Verifica que config.env esté cargado correctamente en los tests`);
+}
 
 /**
  * Guarda un resultado de test en la base de datos

@@ -5,6 +5,7 @@ import StatisticsChart from './StatisticsChart'
 import ResultsTable from './ResultsTable'
 import TrendsChart from './TrendsChart'
 import ResponseTimeChart from './ResponseTimeChart'
+import TestExecutor from './TestExecutor'
 import { getSummary, getStatistics, getResults, getRecentResults } from '../services/api'
 import './Dashboard.css'
 
@@ -117,6 +118,8 @@ function Dashboard() {
             <div className="loading">Cargando...</div>
           ) : (
             <>
+              <TestExecutor />
+              
               <Metrics summary={summary} loading={loading} />
               
               <section className="dashboard-section">
