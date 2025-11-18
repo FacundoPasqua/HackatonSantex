@@ -35,12 +35,12 @@ function Dashboard() {
     loadRecentResults()
   }, [])
 
-  // Actualización automática cada 10 segundos
+  // Actualización automática cada 4 minutos
   useEffect(() => {
     const interval = setInterval(() => {
       loadData()
       loadRecentResults()
-    }, 10000) // Actualizar cada 10 segundos
+    }, 240000) // Actualizar cada 4 minutos (240000ms)
 
     return () => clearInterval(interval)
   }, [filters, pagination.page, pagination.limit])

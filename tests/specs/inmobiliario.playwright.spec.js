@@ -266,11 +266,12 @@ function validarRespuestaConPalabrasClave(respuesta, palabrasClave) {
 async function obtenerRespuestaBot(page, preguntaId) {
   let respuesta = '';
   let intentos = 0;
-  const maxIntentos = 30; // 30 segundos máximo
+  const maxIntentos = 20; // 20 intentos * 3 segundos = 60 segundos máximo
+  const intervaloEspera = 3000; // Esperar 3 segundos entre intentos (bot tarda ~25 seg)
   let chatCerrado = false;
   
   while (intentos < maxIntentos && (!respuesta || respuesta.length < 5)) {
-    await page.waitForTimeout(1000); // Esperar 1 segundo
+    await page.waitForTimeout(intervaloEspera); // Esperar 3 segundos entre intentos
     intentos++;
     
     try {
@@ -534,7 +535,7 @@ if (preguntas.length === 0) {
       const lote = lotes[loteIndex];
       
       test(`Lote ${loteIndex + 1}/${lotes.length} - Preguntas ${lote[0].id} a ${lote[lote.length - 1].id}`, async ({ browser }) => {
-        test.setTimeout(300000); // 5 minutos por lote
+        test.setTimeout(600000); // 10 minutos por lote (aumentado para evitar timeouts)
         const sheets = await sheetsPromise;
 
         console.log(`\n🔥 ===== INICIANDO LOTE ${loteIndex + 1}/${lotes.length} =====`);

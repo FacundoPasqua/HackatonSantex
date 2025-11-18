@@ -29,7 +29,7 @@ function TestExecutor() {
           updateTestStatus(testType, testInfo.test_id)
         }
       })
-    }, 3000) // Actualizar cada 3 segundos
+    }, 5000) // Actualizar cada 5 segundos (reducido para no generar tantos requests)
 
     return () => clearInterval(interval)
   }, [runningTests])
