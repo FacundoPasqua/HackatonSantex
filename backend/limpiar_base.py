@@ -27,6 +27,22 @@ if not DATABASE_URL:
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Si la URL contiene "railway.internal", es una URL interna que no funciona desde fuera
+# Necesitamos obtener la URL pública de Railway
+if "railway.internal" in DATABASE_URL:
+    print("[WARNING] La DATABASE_URL contiene 'railway.internal' (URL interna)")
+    print("[WARNING] Esta URL solo funciona dentro de Railway.")
+    print("[INFO] Necesitas obtener la URL PUBLICA de la base de datos.")
+    print("\nPara obtener la URL publica:")
+    print("1. Ve a Railway -> Tu proyecto -> Servicio de PostgreSQL")
+    print("2. Ve a la pestaña 'Connect' o 'Public Network'")
+    print("3. Copia la URL que dice 'Public Network' o 'Connection String'")
+    print("4. Debe tener un host como: containers-us-west-xxx.railway.app")
+    print("\nO puedes usar Railway CLI:")
+    print("  railway connect postgres")
+    print("\nERROR: No se puede conectar con URL interna desde tu maquina local.")
+    sys.exit(1)
+
 print(f"[INFO] Conectando a la base de datos...")
 print(f"[INFO] URL: {DATABASE_URL[:50]}...")
 
