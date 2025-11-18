@@ -44,10 +44,11 @@ RUN if [ -f package.json ] && [ -d node_modules ]; then \
 WORKDIR /app/backend
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Exponer puerto
+# Exponer puerto (Railway puede usar cualquier puerto, lo detectamos con $PORT)
 EXPOSE 8000
 
 # Comando para iniciar el backend
+# Railway inyecta la variable PORT automáticamente
 WORKDIR /app/backend
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD sh -c "echo '[INFO] ========================================' && echo '[INFO] Starting FastAPI backend' && echo '[INFO] Working directory: $(pwd)' && echo '[INFO] Python version: $(python --version)' && echo '[INFO] PORT variable: ${PORT:-8000}' && echo '[INFO] ========================================' && PORT=\${PORT:-8000} && uvicorn app.main:app --host 0.0.0.0 --port \$PORT"
 
