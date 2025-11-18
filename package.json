@@ -20,10 +20,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.56.1",
     "@types/node": "^24.6.2"
   },
   "dependencies": {
+    "@playwright/test": "^1.56.1",
     "dotenv": "^17.2.3",
     "google-auth-library": "^10.4.0",
     "googleapis": "^161.0.0",
