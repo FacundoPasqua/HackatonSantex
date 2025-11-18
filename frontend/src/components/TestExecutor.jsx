@@ -133,51 +133,61 @@ function TestExecutor() {
     try {
       const status = await getTestStatus(testId)
       if (status) {
+        const progress = calculateProgress(status)
+        console.log(`[UpdateStatus] Actualizando test ${testId} (${testType}): status=${status.status}, progress=${progress}%, started_at=${status.started_at}`)
+        
         setRunningTests(prev => ({
           ...prev,
           [testType]: {
             ...prev[testType],
             ...status,
-            progress: calculateProgress(status),
+            progress: progress,
           }
         }))
 
         // Si el test terminó, actualizar estado
         if (status.status === 'completed' || status.status === 'failed' || status.status === 'error' || status.status === 'timeout' || status.status === 'cancelled') {
-          console.log(`Test ${testId} terminó con estado: ${status.status}`)
+          console.log(`[UpdateStatus] Test ${testId} terminó con estado: ${status.status}`)
           // Verificar si hay otros tests corriendo
           const response = await getRunningTests()
           if (response.running_tests.length === 0) {
             setAnyTestRunning(false)
           }
         }
+      } else {
+        console.warn(`[UpdateStatus] No se obtuvo status para test ${testId}`)
       }
     } catch (err) {
-      console.error('Error updating test status:', err)
+      console.error('[UpdateStatus] Error updating test status:', err)
     }
   }
 
   const calculateProgress = (status) => {
     // Calcular progreso basado en logs o tiempo transcurrido
     if (!status) {
+      console.log('[Progress] No hay status, retornando 0')
       return 0
     }
     
     // Si está en cola, mostrar 0%
     if (status.status === 'queued') {
+      console.log('[Progress] Status es queued, retornando 0')
       return 0
     }
     
     // Si está completado, falló, o cancelado, mostrar 100% o 0%
     if (status.status === 'completed') {
+      console.log('[Progress] Status es completed, retornando 100')
       return 100
     }
     if (status.status === 'failed' || status.status === 'error' || status.status === 'timeout' || status.status === 'cancelled') {
+      console.log(`[Progress] Status es ${status.status}, retornando 0`)
       return 0
     }
     
     // Si está corriendo, calcular basado en tiempo
     if (!status.started_at) {
+      console.log('[Progress] No hay started_at, retornando 0', status)
       return 0
     }
     
@@ -187,7 +197,7 @@ function TestExecutor() {
       
       // Verificar que las fechas sean válidas
       if (isNaN(started.getTime()) || isNaN(now.getTime())) {
-        console.warn('Fechas inválidas en calculateProgress:', { started_at: status.started_at, now })
+        console.warn('[Progress] Fechas inválidas:', { started_at: status.started_at, started: started, now: now })
         return 0
       }
       
@@ -195,7 +205,7 @@ function TestExecutor() {
       
       // Si el tiempo transcurrido es negativo, retornar 0
       if (elapsed < 0) {
-        console.warn('Tiempo transcurrido negativo:', elapsed)
+        console.warn('[Progress] Tiempo transcurrido negativo:', elapsed, { started: started.toISOString(), now: now.toISOString() })
         return 0
       }
       
@@ -206,7 +216,7 @@ function TestExecutor() {
         // Calcular progreso: (tiempo transcurrido / tiempo estimado) * 100
         const progress = Math.min(95, (elapsed / estimated) * 100)
         const rounded = Math.max(0, Math.round(progress)) // Asegurar que no sea negativo
-        console.log(`Progreso calculado: ${rounded}% (${elapsed.toFixed(2)} min / ${estimated} min)`)
+        console.log(`[Progress] Calculado: ${rounded}% (${elapsed.toFixed(2)} min / ${estimated} min) - test_type: ${status.test_type}, base encontrada: ${!!base}`)
         return rounded
       }
       
@@ -214,9 +224,11 @@ function TestExecutor() {
       // Asumir 20 minutos por defecto
       const defaultEstimated = 20
       const progress = Math.min(95, (elapsed / defaultEstimated) * 100)
-      return Math.max(0, Math.round(progress))
+      const rounded = Math.max(0, Math.round(progress))
+      console.log(`[Progress] Usando estimado por defecto: ${rounded}% (${elapsed.toFixed(2)} min / ${defaultEstimated} min) - test_type: ${status.test_type}, bases disponibles: ${bases.map(b => b.id).join(', ')}`)
+      return rounded
     } catch (err) {
-      console.error('Error calculando progreso:', err, status)
+      console.error('[Progress] Error calculando progreso:', err, status)
       return 0
     }
   }

@@ -6,7 +6,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Obtener DATABASE_URL de las variables de entorno
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test_results.db")
+# Si no está configurada, usar SQLite local
+# Para usar la base de producción, configurar DATABASE_URL en .env o variables de entorno
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Si no hay DATABASE_URL, usar SQLite local
+if not DATABASE_URL:
+    DATABASE_URL = "sqlite:///./test_results.db"
+    print("[INFO] Usando base de datos SQLite local")
+else:
+    print("[INFO] Usando base de datos PostgreSQL (Railway)")
 
 # Railway usa postgres:// pero SQLAlchemy necesita postgresql://
 # Convertir si es necesario
