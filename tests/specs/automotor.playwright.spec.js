@@ -396,41 +396,57 @@ if (preguntas.length === 0) {
       console.log(`🌐 [${p.id}] Navegando a: ${BOT_URL}`);
       await page.goto(BOT_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.waitForLoadState('networkidle', { timeout: 60000 });
-      // Esperar un poco más para que el DOM esté completamente listo
-      await page.waitForTimeout(3000);
-      console.log(`✅ [${p.id}] Página cargada correctamente`);
       
-      // Debug: Verificar qué botones están presentes en la página
+      // Esperar a que Angular termine de renderizar (el botón tiene mat-fab que es Angular Material)
+      // Esperar hasta 60 segundos para que aparezca el botón con class="chat-fab"
+      console.log(`⏳ [${p.id}] Esperando a que Angular renderice el botón del chat...`);
       try {
-        const allButtons = await page.locator('button').all();
-        console.log(`🔍 [${p.id}] Botones encontrados en la página: ${allButtons.length}`);
-        for (let i = 0; i < Math.min(allButtons.length, 5); i++) {
-          const buttonText = await allButtons[i].textContent().catch(() => '');
-          const buttonClass = await allButtons[i].getAttribute('class').catch(() => '');
-          console.log(`🔍 [${p.id}] Botón ${i + 1}: class="${buttonClass}", text="${buttonText?.substring(0, 50)}"`);
-        }
+        await page.waitForSelector('button.chat-fab', { state: 'visible', timeout: 60000 });
+        console.log(`✅ [${p.id}] Botón chat-fab encontrado y visible`);
       } catch (err) {
-        console.log(`⚠️ [${p.id}] Error listando botones: ${err.message}`);
+        console.log(`⚠️ [${p.id}] Botón chat-fab no apareció, intentando otros selectores...`);
+        // Intentar con aria-label
+        try {
+          await page.waitForSelector('button[aria-label="Abrir chat"]', { state: 'visible', timeout: 10000 });
+          console.log(`✅ [${p.id}] Botón encontrado por aria-label`);
+        } catch (err2) {
+          // Intentar con mat-fab
+          try {
+            await page.waitForSelector('button[mat-fab]', { state: 'visible', timeout: 10000 });
+            console.log(`✅ [${p.id}] Botón encontrado por mat-fab`);
+          } catch (err3) {
+            // Debug: Verificar qué hay en la página
+            const pageContent = await page.content().catch(() => '');
+            const hasChatFab = pageContent.includes('chat-fab');
+            const hasMatFab = pageContent.includes('mat-fab');
+            console.log(`🔍 [${p.id}] Debug - HTML contiene 'chat-fab': ${hasChatFab}, contiene 'mat-fab': ${hasMatFab}`);
+            
+            // Tomar screenshot para debugging
+            await page.screenshot({ path: `test-results/error-chat-button-${p.id}.png`, fullPage: true }).catch(() => {});
+            throw new Error(`No se pudo encontrar el botón del chat. HTML contiene 'chat-fab': ${hasChatFab}, 'mat-fab': ${hasMatFab}`);
+          }
+        }
       }
       
-      // Intentar encontrar el botón del chat con múltiples estrategias
+      // Esperar un poco más para asegurar que el botón esté completamente interactivo
+      await page.waitForTimeout(1000);
+      console.log(`✅ [${p.id}] Página cargada correctamente`);
+      
+      // Buscar el botón con el selector correcto (prioridad: chat-fab, luego aria-label, luego mat-fab)
       let chatButton = null;
       const selectors = [
         'button.chat-fab',
-        'button[class*="chat"]',
-        'button[class*="Chat"]',
+        'button[aria-label="Abrir chat"]',
         'button[aria-label*="chat" i]',
-        'button[aria-label*="Chat" i]',
-        '[role="button"][class*="chat" i]',
-        'button:has-text("chat")',
-        'button:has-text("Chat")',
+        'button[mat-fab]',
+        'button[class*="chat-fab"]',
       ];
       
-      console.log(`🔍 [${p.id}] Buscando botón del chat...`);
+      console.log(`🔍 [${p.id}] Buscando botón del chat con selectores específicos...`);
       for (const selector of selectors) {
         try {
           const button = page.locator(selector).first();
-          const isVisible = await button.isVisible({ timeout: 5000 }).catch(() => false);
+          const isVisible = await button.isVisible({ timeout: 2000 }).catch(() => false);
           if (isVisible) {
             console.log(`✅ [${p.id}] Botón encontrado con selector: ${selector}`);
             chatButton = button;
@@ -442,17 +458,7 @@ if (preguntas.length === 0) {
       }
       
       if (!chatButton) {
-        // Si no encontramos el botón, intentar buscar cualquier botón flotante
-        console.log(`⚠️ [${p.id}] No se encontró botón con selectores conocidos, buscando botones flotantes...`);
-        const floatingButtons = await page.locator('button[style*="position"]').or(page.locator('button[style*="fixed"]')).or(page.locator('button[style*="absolute"]')).all();
-        if (floatingButtons.length > 0) {
-          console.log(`🔍 [${p.id}] Encontrados ${floatingButtons.length} botones flotantes, usando el primero`);
-          chatButton = page.locator('button[style*="position"]').or(page.locator('button[style*="fixed"]')).or(page.locator('button[style*="absolute"]')).first();
-        } else {
-          // Tomar screenshot para debugging
-          await page.screenshot({ path: `test-results/error-chat-button-${p.id}.png`, fullPage: true }).catch(() => {});
-          throw new Error(`No se pudo encontrar el botón del chat después de intentar ${selectors.length} selectores diferentes`);
-        }
+        throw new Error(`No se pudo encontrar el botón del chat después de intentar ${selectors.length} selectores específicos`);
       }
       
       // Hacer click en el botón encontrado
