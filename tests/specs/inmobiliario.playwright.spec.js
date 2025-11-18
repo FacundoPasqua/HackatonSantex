@@ -392,7 +392,27 @@ if (preguntas.length === 0) {
       // Navegar a la página
       console.log(`🌐 [${p.id}] Navegando a: ${BOT_URL}`);
       await page.goto(BOT_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      
+      // Verificar que la página cargó correctamente
+      const pageTitle = await page.title().catch(() => '');
+      const pageUrl = page.url();
+      console.log(`🔍 [${p.id}] Título de la página: "${pageTitle}"`);
+      console.log(`🔍 [${p.id}] URL actual: ${pageUrl}`);
+      
+      // Esperar a que la página termine de cargar
       await page.waitForLoadState('networkidle', { timeout: 60000 });
+      
+      // Esperar adicional para que Angular renderice (Angular puede tardar en renderizar componentes)
+      await page.waitForTimeout(5000);
+      
+      // Debug: Verificar qué hay en el HTML antes de buscar el botón
+      const pageContent = await page.content().catch(() => '');
+      const hasChatFab = pageContent.includes('chat-fab');
+      const hasMatFab = pageContent.includes('mat-fab');
+      const hasAngular = pageContent.includes('ng-version') || pageContent.includes('_ngcontent');
+      const bodyText = await page.locator('body').textContent().catch(() => '');
+      console.log(`🔍 [${p.id}] Debug inicial - HTML contiene 'chat-fab': ${hasChatFab}, 'mat-fab': ${hasMatFab}, 'Angular': ${hasAngular}`);
+      console.log(`🔍 [${p.id}] Primeros 200 caracteres del body: "${bodyText?.substring(0, 200)}"`);
       
       // Esperar a que Angular termine de renderizar (el botón tiene mat-fab que es Angular Material)
       // Esperar hasta 60 segundos para que aparezca el botón con class="chat-fab"
@@ -401,7 +421,14 @@ if (preguntas.length === 0) {
         await page.waitForSelector('button.chat-fab', { state: 'visible', timeout: 60000 });
         console.log(`✅ [${p.id}] Botón chat-fab encontrado y visible`);
       } catch (err) {
-        console.log(`⚠️ [${p.id}] Botón chat-fab no apareció, intentando otros selectores...`);
+        console.log(`⚠️ [${p.id}] Botón chat-fab no apareció después de 60s, intentando otros selectores...`);
+        
+        // Verificar HTML nuevamente después de la espera
+        const pageContentAfter = await page.content().catch(() => '');
+        const hasChatFabAfter = pageContentAfter.includes('chat-fab');
+        const hasMatFabAfter = pageContentAfter.includes('mat-fab');
+        console.log(`🔍 [${p.id}] Debug después de espera - HTML contiene 'chat-fab': ${hasChatFabAfter}, 'mat-fab': ${hasMatFabAfter}`);
+        
         // Intentar con aria-label
         try {
           await page.waitForSelector('button[aria-label="Abrir chat"]', { state: 'visible', timeout: 10000 });
@@ -412,15 +439,25 @@ if (preguntas.length === 0) {
             await page.waitForSelector('button[mat-fab]', { state: 'visible', timeout: 10000 });
             console.log(`✅ [${p.id}] Botón encontrado por mat-fab`);
           } catch (err3) {
-            // Debug: Verificar qué hay en la página
-            const pageContent = await page.content().catch(() => '');
-            const hasChatFab = pageContent.includes('chat-fab');
-            const hasMatFab = pageContent.includes('mat-fab');
-            console.log(`🔍 [${p.id}] Debug - HTML contiene 'chat-fab': ${hasChatFab}, contiene 'mat-fab': ${hasMatFab}`);
+            // Intentar esperar cualquier botón que aparezca
+            try {
+              await page.waitForSelector('button', { state: 'visible', timeout: 10000 });
+              const allButtons = await page.locator('button').all();
+              console.log(`🔍 [${p.id}] Se encontraron ${allButtons.length} botones en total`);
+              if (allButtons.length > 0) {
+                for (let i = 0; i < Math.min(allButtons.length, 3); i++) {
+                  const btnClass = await allButtons[i].getAttribute('class').catch(() => '');
+                  const btnAria = await allButtons[i].getAttribute('aria-label').catch(() => '');
+                  console.log(`🔍 [${p.id}] Botón ${i + 1}: class="${btnClass}", aria-label="${btnAria}"`);
+                }
+              }
+            } catch (err4) {
+              console.log(`⚠️ [${p.id}] No se encontró ningún botón en la página`);
+            }
             
             // Tomar screenshot para debugging
             await page.screenshot({ path: `test-results/error-chat-button-${p.id}.png`, fullPage: true }).catch(() => {});
-            throw new Error(`No se pudo encontrar el botón del chat. HTML contiene 'chat-fab': ${hasChatFab}, 'mat-fab': ${hasMatFab}`);
+            throw new Error(`No se pudo encontrar el botón del chat. HTML contiene 'chat-fab': ${hasChatFabAfter}, 'mat-fab': ${hasMatFabAfter}. URL: ${pageUrl}`);
           }
         }
       }
