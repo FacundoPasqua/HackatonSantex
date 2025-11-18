@@ -41,19 +41,28 @@ app = FastAPI(
 )
 
 # CORS para permitir frontend y tests
-ALLOWED_ORIGINS = os.getenv(
+ALLOWED_ORIGINS_STR = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:8000,*"
-).split(",")
+    "http://localhost:3000,http://localhost:8000,https://qaiax.vercel.app"
+)
 
-# Si hay "*" en los orígenes, permitir todos (útil para tests desde cualquier origen)
-if "*" in ALLOWED_ORIGINS:
+# Procesar los orígenes permitidos
+if ALLOWED_ORIGINS_STR.strip() == "*":
+    # Si es "*", permitir todos los orígenes pero sin credentials
     ALLOWED_ORIGINS = ["*"]
+    ALLOW_CREDENTIALS = False
+else:
+    # Si hay una lista, procesarla
+    ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_STR.split(",") if origin.strip()]
+    ALLOW_CREDENTIALS = True
+
+print(f"[INFO] CORS configured with origins: {ALLOWED_ORIGINS}")
+print(f"[INFO] CORS allow_credentials: {ALLOW_CREDENTIALS}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
