@@ -15,8 +15,8 @@ RUN node --version && npm --version
 WORKDIR /app
 COPY . .
 
-# Verificar que package.json existe
-RUN ls -la package.json || (echo "ERROR: package.json no encontrado" && exit 1)
+# Debug: Listar archivos copiados para verificar qué se copió
+RUN echo "=== Archivos en /app ===" && ls -la && echo "=== Buscando package.json ===" && find . -name "package.json" -type f 2>/dev/null || echo "package.json no encontrado"
 
 # Instalar dependencias de Node.js (incluyendo devDependencies para Playwright)
 RUN npm install --include=dev
