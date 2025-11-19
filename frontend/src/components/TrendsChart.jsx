@@ -23,7 +23,9 @@ function TrendsChart({ data }) {
           }
         }
         
-        hourlyData[hour][item.resultado_final] = (hourlyData[hour][item.resultado_final] || 0) + 1
+        // Normalizar: todos los tipos de FAIL (FAIL, FAIL (JSON), FAIL (NO ENCONTRADO), etc.) se cuentan como FAIL
+        const resultadoNormalizado = item.resultado_final === 'PASS' ? 'PASS' : 'FAIL'
+        hourlyData[hour][resultadoNormalizado] = (hourlyData[hour][resultadoNormalizado] || 0) + 1
       } catch (e) {
         console.error('Error processing timestamp:', item.timestamp, e)
       }

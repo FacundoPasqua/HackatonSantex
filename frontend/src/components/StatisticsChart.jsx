@@ -8,6 +8,7 @@ function StatisticsChart({ data }) {
   }
 
   // Agrupar por tipo de test, sumando todos los entornos
+  // Normalizar todos los tipos de FAIL (FAIL, FAIL (JSON), FAIL (NO ENCONTRADO), etc.) a un solo FAIL
   const chartData = {}
   
   data.forEach(item => {
@@ -19,10 +20,11 @@ function StatisticsChart({ data }) {
         FAIL: 0,
       }
     }
-    // Sumar los valores, no reemplazarlos
-    if (item.resultado_final === 'PASS') {
+    // Normalizar: todos los tipos de FAIL se cuentan como FAIL
+    const resultadoNormalizado = item.resultado_final === 'PASS' ? 'PASS' : 'FAIL'
+    if (resultadoNormalizado === 'PASS') {
       chartData[testType].PASS += item.count
-    } else if (item.resultado_final === 'FAIL') {
+    } else {
       chartData[testType].FAIL += item.count
     }
   })

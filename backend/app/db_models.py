@@ -28,6 +28,12 @@ def create_test_result(data: Dict[str, Any]) -> Dict[str, Any]:
         db.commit()
         db.refresh(db_result)
         
+        # Verificar que realmente se guardó
+        if not db_result.id:
+            raise Exception("El registro no se guardó correctamente - no tiene ID")
+        
+        print(f"[DB] Registro guardado en PostgreSQL - ID: {db_result.id}, Test ID: {db_result.test_id}", flush=True)
+        
         # Convertir a diccionario
         result = {
             "id": str(db_result.id),  # Convertir a string para compatibilidad con API
@@ -48,6 +54,12 @@ def create_test_result(data: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         return result
+    except Exception as e:
+        db.rollback()
+        print(f"[ERROR] Error en create_test_result: {str(e)}", flush=True)
+        import traceback
+        print(f"[TRACEBACK] {traceback.format_exc()}", flush=True)
+        raise
     finally:
         db.close()
 
@@ -176,7 +188,7 @@ def get_statistics(
     test_type: Optional[str] = None,
     environment: Optional[str] = None
 ) -> List[Dict[str, Any]]:
-    """Obtener estadísticas agrupadas"""
+    """Obtener estadísticas agrupadas - todos los tipos de FAIL se normalizan a 'FAIL'"""
     db = SessionLocal()
     try:
         query = db.query(
@@ -202,15 +214,38 @@ def get_statistics(
         
         results = query.all()
         
-        # Convertir a formato de respuesta
-        response = []
+        # Agrupar manualmente normalizando todos los tipos de FAIL a 'FAIL'
+        stats_dict = {}
         for row in results:
+            # Normalizar resultado_final: todos los tipos de FAIL se convierten a 'FAIL'
+            resultado_normalizado = 'PASS' if row.resultado_final == 'PASS' else 'FAIL'
+            
+            key = (row.test_type or "unknown", row.environment or "all", resultado_normalizado)
+            
+            if key not in stats_dict:
+                stats_dict[key] = {
+                    "test_type": row.test_type or "unknown",
+                    "environment": row.environment or "all",
+                    "resultado_final": resultado_normalizado,
+                    "count": 0,
+                    "total_time": 0.0,
+                    "count_records": 0
+                }
+            
+            stats_dict[key]["count"] += row.count
+            stats_dict[key]["total_time"] += float(row.avg_time or 0) * row.count
+            stats_dict[key]["count_records"] += row.count
+        
+        # Convertir a formato de respuesta calculando el promedio de tiempo
+        response = []
+        for key, data in stats_dict.items():
+            avg_time = round(data["total_time"] / data["count_records"], 2) if data["count_records"] > 0 else 0
             response.append({
-                "test_type": row.test_type or "unknown",
-                "environment": row.environment or "all",
-                "resultado_final": row.resultado_final,
-                "count": row.count,
-                "avg_time": round(float(row.avg_time or 0), 2)
+                "test_type": data["test_type"],
+                "environment": data["environment"],
+                "resultado_final": data["resultado_final"],
+                "count": data["count"],
+                "avg_time": avg_time
             })
         
         return response

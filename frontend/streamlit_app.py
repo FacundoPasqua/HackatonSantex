@@ -157,7 +157,13 @@ try:
             recent_df['timestamp'] = pd.to_datetime(recent_df['timestamp'])
             recent_df['hour'] = recent_df['timestamp'].dt.floor('H')
             
-            hourly_stats = recent_df.groupby(['hour', 'resultado_final']).size().reset_index(name='count')
+            # Normalizar todos los tipos de FAIL a un solo 'FAIL'
+            recent_df['resultado_final_normalizado'] = recent_df['resultado_final'].apply(
+                lambda x: 'PASS' if x == 'PASS' else 'FAIL'
+            )
+            
+            hourly_stats = recent_df.groupby(['hour', 'resultado_final_normalizado']).size().reset_index(name='count')
+            hourly_stats = hourly_stats.rename(columns={'resultado_final_normalizado': 'resultado_final'})
             
             fig = px.line(
                 hourly_stats,

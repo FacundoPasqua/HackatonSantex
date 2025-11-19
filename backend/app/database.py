@@ -10,8 +10,13 @@ load_dotenv()
 # Para usar la base de producción, configurar DATABASE_URL en .env o variables de entorno
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Si no hay DATABASE_URL, usar SQLite local
+# Si no hay DATABASE_URL o es una URL de ejemplo, usar SQLite local
 if not DATABASE_URL:
+    DATABASE_URL = "sqlite:///./test_results.db"
+    print("[INFO] Usando base de datos SQLite local (DATABASE_URL no configurada)")
+elif "containers-us-west-xxx" in DATABASE_URL or "password" in DATABASE_URL:
+    # URL de ejemplo detectada, usar SQLite local
+    print("[WARNING] DATABASE_URL contiene valores de ejemplo, usando SQLite local")
     DATABASE_URL = "sqlite:///./test_results.db"
     print("[INFO] Usando base de datos SQLite local")
 else:
